@@ -1,0 +1,46 @@
+name: Capture iPhone layout
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  previews:
+    if: github.event.repository.private == false
+    runs-on: macos-15
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build simulator app
+        run: |
+          unzip -q Loik-iPhone.zip
+          cd Loik-iPhone
+          xcodebuild build -project Loik.xcodeproj -scheme Loik -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath DerivedData CODE_SIGNING_ALLOWED=NO
+      - name: Capture layouts in a fresh simulator
+        timeout-minutes: 6
+        working-directory: Loik-iPhone
+        run: |
+          python3 -u - <<'PY'
+          import subprocess,json,time,pathlib
+          def run(*args, timeout=45):
+              print('RUN', *args, flush=True)
+              return subprocess.run(args, check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout).stdout
+          devices=json.loads(run('xcrun','simctl','list','devices','available','-j'))
+          device=next(d['udid'] for group in devices['devices'].values() for d in group if 'iPhone' in d['name'])
+          print(run('xcrun','simctl','boot',device))
+          print(run('open','-a','Simulator'))
+          print(run('xcrun','simctl','bootstatus',device,'-b',timeout=120))
+          print(run('xcrun','simctl','install',device,'DerivedData/Build/Products/Debug-iphonesimulator/Loik.app'))
+          pathlib.Path('previews').mkdir(exist_ok=True)
+          for name, args in [('projects',[]),('gallery-layout-preview',['--preview-gallery']),('settings-layout-preview',['--preview-settings'])]:
+              print(run('xcrun','simctl','launch','--terminate-running-process',device,'local.loik.editor',*args))
+              time.sleep(5)
+              print(run('xcrun','simctl','io',device,'screenshot','previews/'+name+'.png'))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Loik-layout-previews
+          path: Loik-iPhone/previews/*.png
+          retention-days: 7
