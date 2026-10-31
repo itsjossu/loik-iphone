@@ -44,25 +44,6 @@ jobs:
           name: Loik-test-diagnostics
           path: Loik-iPhone/TestResults.xcresult
           retention-days: 1
-      - name: Capture simulator previews
-        timeout-minutes: 2
-        continue-on-error: true
-        working-directory: Loik-iPhone
-        run: |
-          DEVICE=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for devices in d["devices"].values() for x in devices if "iPhone" in x["name"]))')
-          xcrun simctl boot "$DEVICE" 2>/dev/null || true
-          xcrun simctl bootstatus "$DEVICE" -b
-          mkdir -p previews
-          xcrun simctl status_bar "$DEVICE" override --time '9:41' --batteryState charged --batteryLevel 100
-          xcrun simctl launch --terminate-running-process "$DEVICE" local.loik.editor
-          sleep 3
-          xcrun simctl io "$DEVICE" screenshot previews/projects.png
-          xcrun simctl launch --terminate-running-process "$DEVICE" local.loik.editor --preview-gallery
-          sleep 3
-          xcrun simctl io "$DEVICE" screenshot previews/gallery-layout-preview.png
-          xcrun simctl launch --terminate-running-process "$DEVICE" local.loik.editor --preview-settings
-          sleep 3
-          xcrun simctl io "$DEVICE" screenshot previews/settings-layout-preview.png
       - name: Compile unsigned device build
         working-directory: Loik-iPhone
         run: |
