@@ -45,12 +45,13 @@ jobs:
           path: Loik-iPhone/TestResults.xcresult
           retention-days: 1
       - name: Capture simulator previews
+        timeout-minutes: 2
+        continue-on-error: true
         working-directory: Loik-iPhone
         run: |
           DEVICE=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for devices in d["devices"].values() for x in devices if "iPhone" in x["name"]))')
           xcrun simctl boot "$DEVICE" 2>/dev/null || true
           xcrun simctl bootstatus "$DEVICE" -b
-          xcrun simctl install "$DEVICE" DerivedData/Build/Products/Debug-iphonesimulator/Loik.app
           mkdir -p previews
           xcrun simctl status_bar "$DEVICE" override --time '9:41' --batteryState charged --batteryLevel 100
           xcrun simctl launch --terminate-running-process "$DEVICE" local.loik.editor
