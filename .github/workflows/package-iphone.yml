@@ -1,0 +1,47 @@
+name: Package unsigned iPhone app
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  public-only:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require a public repository to avoid billed private macOS minutes
+        env:
+          PRIVATE_REPOSITORY: ${{ github.event.repository.private }}
+        run: |
+          if [ "$PRIVATE_REPOSITORY" != "false" ]; then
+            echo 'This workflow only builds public repositories. No macOS build was started.'
+            exit 1
+          fi
+  build:
+    needs: public-only
+    if: github.event.repository.private == false
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract source archive
+        run: unzip -q Loik-iPhone.zip
+      - name: Show Xcode version
+        run: xcodebuild -version
+      - name: Compile unsigned device build
+        working-directory: Loik-iPhone
+        run: |
+          xcodebuild -project Loik.xcodeproj -scheme Loik -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath DerivedData CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+      - name: Package unsigned IPA for local signing
+        working-directory: Loik-iPhone
+        run: |
+          mkdir -p Payload
+          cp -R DerivedData/Build/Products/Release-iphoneos/Loik.app Payload/
+          /usr/bin/zip -qry Loik-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Loik-unsigned-IPA
+          path: |
+            Loik-iPhone/Loik-unsigned.ipa
+            Loik-iPhone/previews/*.png
+          retention-days: 7
